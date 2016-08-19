@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.core.exceptions import ValidationError
 import googlemaps
-from pulp import LpBinary, LpInteger, LpMaximize, LpProblem,\
+from pulp import LpBinary, LpMaximize, LpProblem,\
     LpVariable, value
 from rudi.models import Course, Group
 
@@ -9,6 +9,7 @@ from rudi.models import Course, Group
 ERROR_MULTIPLE_EVENTS = "Not all groups belonged to the same event"
 ERROR_MIN_TEAM_NOT_FULLFILLED = "There must be at least 9 teams to be assigned"
 ERROR_NOT_DIVIDABLE_BY_THREE = "The number of teams is not dividable by 3"
+DEFAULT_DISTANCE = 1200
 
 
 class Coordinator():
@@ -19,20 +20,17 @@ class Coordinator():
     def assign_to_groups(self, method="simple"):
         if method == "simple":
             self._load_data_simple()
-        else:
+        elif method == "distance":
+            # TODO ensure that there is only one instance running
+            # (e.g. celery lock)
             self._load_data_distance()
+        else:
+            raise ValidationError("unkown assignment method %s" % method)
         self.prob.solve()
 
     def get_groups(self):
         members = {}
         chefs = {}
-        # for c in self.COURSES:
-        #     for g in self.groups:
-        #         for t in self.teams:
-        #             for i in self.teams:
-        #                 for j in self.teams:
-        #                     if value(self.arc[c][i][j][t][g]) == 1:
-        #                         print("Course: %s, Gruppe: %s, Team: %s From: %s, To: %s" % (c,g,t,i,j))
         for c in self.COURSES:
             members[c] = {}
             chefs[c] = {}
@@ -134,7 +132,7 @@ class Coordinator():
         self.groups = [g for g in range(len(self.teams) / 3)]
         self.happiness = {}
         self.distance = {}
-        # self.gmaps = googlemaps.Client(key=settings.GOOGLE_API_KEY)
+        self.gmaps = googlemaps.Client(key=settings.GOOGLE_API_KEY)
         # Sets
         for t in self.teams:
             # check if all teams are from the same event
@@ -156,22 +154,23 @@ class Coordinator():
             for dt in self.teams:
                 if dt is t:
                     self.distance[t][dt] = 0
-                elif t.name == "TestTeam1Name" and dt.name == "TestTeam7Name":
-                    self.distance[t][dt] = 120000
-                elif t.name == "TestTeam7Name" and dt.name == "TestTeam1Name":
-                    self.distance[t][dt] = 120000
                 else:
-                    #TODO mind max. request limit server not responding
+                    # TODO mind max. request limit server not responding
+                    # TODO save known distances to avoid unnecessary requests
                     try:
-                        r = 1200
-                        # r = self.gmaps.distance_matrix(
-                        #     origins="%s,%s,%s" % (t.postal_code, t.city, t.street),
-                        #     destinations="%s,%s,%s" % (dt.postal_code, dt.city, dt.street),
-                        #     mode="walking",
-                        # )
+                        r = self.gmaps.distance_matrix(
+                            origins="%s,%s,%s" % (
+                                t.postal_code, t.city, t.street),
+                            destinations="%s,%s,%s" % (
+                                dt.postal_code, dt.city, dt.street),
+                            mode="walking",
+                        )
                     except googlemaps.exceptions.Timeout():
-                        pass
-                    self.distance[t][dt] = r #  ["rows"][0]["elements"][0]["duration"]["value"] if r else 1200
+                        self.distance[t][dt] = DEFAULT_DISTANCE
+                    else:
+                        self.distance[t][dt] =\
+                            r["rows"][0]["elements"][0]["duration"]["value"]\
+                            if r else DEFAULT_DISTANCE
         # binary Decision Variables
         self.assign = LpVariable.dicts(
             "Assign team t to group g for course ",
@@ -180,7 +179,7 @@ class Coordinator():
             "Make team t chef of group g for course ",
             (self.COURSES, self.teams, self.groups), 0, 1, LpBinary)
         self.arc = LpVariable.dicts(
-            "TODO",
+            "The Route between team i and team j for team t in course c in group g",
             (self.COURSES, self.teams, self.teams, self.teams, self.groups), 0, 1, LpBinary)
         # add equations to model
         self._objective_distance()
@@ -191,10 +190,10 @@ class Coordinator():
         self._teams_as_chef_in_group()
         self._teams_as_chef_once()
         self._teams_as_chef_only_in_group()
-        self._a0()
-        self._a()
-        self._c2()
-        self._d()
+        self._routes_for_assigned_teams_only()
+        self._start_from_home()
+        self._routes_to_chef_only()
+        self._start_from_previous_destination()
 
     def _objective_simple(self):
         """
@@ -224,7 +223,7 @@ class Coordinator():
             for g in self.groups
         )
 
-    def _a(self):
+    def _routes_for_assigned_teams_only(self):
         """
         in each course each team can go only the route to a group if it is assigned to it
         """
@@ -235,7 +234,7 @@ class Coordinator():
                         [self.arc[self.COURSES[c]][i][j][t][g] for i in self.teams
                          for j in self.teams]) == self.assign[self.COURSES[c]][t][g]
 
-    def _a0(self):
+    def _start_from_home(self):
         """
         teams start from their home location
         """
@@ -245,7 +244,7 @@ class Coordinator():
                     [self.arc[self.COURSES[0]][t][j][t][g] for j in self.teams])\
                              == self.assign[self.COURSES[0]][t][g]
 
-    def _c2(self):
+    def _routes_to_chef_only(self):
         """
         Teams can only go to the chef of their group
         """
@@ -257,19 +256,16 @@ class Coordinator():
                             self.prob += self.arc[c][i][j][t][g]\
                              <= self.chef[c][j][g]
 
-    def _d(self):
+    def _start_from_previous_destination(self):
         """
-        The starting point for a route is the location of the chef
-        in the previous course USELESS
+        The starting point for a route is the destinatino of prev. course
         """
         for c in range(1, len(self.COURSES)):
             for t in self.teams:
                 for i in self.teams:
-                    for g in self.groups:
-                        for gg in self.groups:
-                            self.prob +=\
-                                sum([self.arc[self.COURSES[c]][i][j][t][g] for j in self.teams if j is not i])\
-                                 == sum([self.arc[self.COURSES[c-1]][r][i][t][gg] for r in self.teams if r is not i])
+                    self.prob +=\
+                        sum([self.arc[self.COURSES[c]][i][j][t][g] for j in self.teams for g in self.groups if j is not i])\
+                         == sum([self.arc[self.COURSES[c-1]][r][i][t][g] for r in self.teams for g in self.groups])
 
 
     def _team_to_group_per_course(self):

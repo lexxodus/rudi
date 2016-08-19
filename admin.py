@@ -38,14 +38,14 @@ class CustomTeamAdminForm(forms.ModelForm):
 
 class TeamAdmin(admin.ModelAdmin):
     form = CustomTeamAdminForm
-    actions = ['assign_to_group', "send_custom_mail"]
+    actions = ['assign_to_group_quick', 'assign_to_group_distance', "send_custom_mail"]
     list_display = (
         'event', 'name', 'participant_1_firstname', 'participant_1_lastname',
         'participant_2_firstname', 'participant_2_lastname', "language",
         "email_confirmed", "sent_mail")
     list_filter = ('event',)
 
-    def assign_to_group(self, request, queryset):
+    def assign_to_group_quick(self, request, queryset):
         if queryset.filter(has_confirmed_email=False).exists():
             messages.error(request, ERROR_EMAIL_NOT_CONFIRMED)
             return
@@ -55,6 +55,21 @@ class TeamAdmin(admin.ModelAdmin):
             messages.error(request, e.message)
         else:
             coordinator.assign_to_groups()
+            entries = coordinator.create_group_entries()
+            self.message_user(
+                request, MESSAGE_GROUPS_ASSIGNED %
+                entries)
+
+    def assign_to_group_distance(self, request, queryset):
+        if queryset.filter(has_confirmed_email=False).exists():
+            messages.error(request, ERROR_EMAIL_NOT_CONFIRMED)
+            return
+        try:
+            coordinator = Coordinator(queryset)
+        except ValidationError as e:
+            messages.error(request, e.message)
+        else:
+            coordinator.assign_to_groups(method="distance")
             entries = coordinator.create_group_entries()
             self.message_user(
                 request, MESSAGE_GROUPS_ASSIGNED %
@@ -167,9 +182,27 @@ class TeamAdmin(admin.ModelAdmin):
 
 class GroupAdmin(admin.ModelAdmin):
     actions = ["send_assignment_mail"]
-    list_display = ('event', 'course', 'chef', 'member1', 'member2',
+    list_display = ('event', 'course', 'chef_with_link', 'member1_with_link', 'member2_with_link',
                     "sent_mail")
     list_filter = ('event', 'course')
+
+    def chef_with_link(self, obj):
+        link=reverse("admin:rudi_team_change", args=[obj.chef.id])
+        return "<a href='%s'>%s</a>" % (link, obj.chef)
+    chef_with_link.allow_tags=True
+    chef_with_link.short_description="Chef"
+
+    def member1_with_link(self, obj):
+        link=reverse("admin:rudi_team_change", args=[obj.member1.id])
+        return "<a href='%s'>%s</a>" % (link, obj.member1)
+    member1_with_link.allow_tags=True
+    member1_with_link.short_description="Member1"
+
+    def member2_with_link(self, obj):
+        link=reverse("admin:rudi_team_change", args=[obj.member2.id])
+        return "<a href='%s'>%s</a>" % (link, obj.member2)
+    member2_with_link.allow_tags=True
+    member2_with_link.short_description="Member2"
 
     def sent_mail(self, obj):
         sent_assignment_mail = obj.chef.sent_assignment_mail and\
