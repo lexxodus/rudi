@@ -1,0 +1,58 @@
+{% extends "rudi/mails/base.txt" %}
+{% load i18n %}
+{% block content %}
+{% blocktrans with appetizer_time=chef.event.appetizer_time|date:"H.i" host_appetizer=chef_appetizer.name %}
+Hallo liebe Köche und Runner,
+
+wir haben für euch euren abend geplant. Dieser sieht wie folgt aus:
+
+**Vorspeise**
+Uhrzeit: {{ appetizer_time }} Uhr
+Alle infos zu euren Gastgebern:
+{{ host_appetizer}}{% endblocktrans %}
+{{ chef_appetizer.street }}, {{ chef_appetizer.postal_code }} {{ chef_appetizer.city }}
+{{ chef_appetizer.participant_1_phone }}{% if chef_appetizer.participant_2_phone %} bzw. {{ chef_appetizer.participant_2_phone }}{% endif %}
+{% trans "Klingel Hinweis:" %} {{ chef_appetizer.doorbell }}
+
+
+{% blocktrans with main_course_time=chef.event.main_course_time|date:"H.i" host_main_course=chef_main_course.name %}
+**Hauptgang**
+Uhrzeit: {{ main_course_time }} Uhr
+Alle infos zu euren Gastgebern:
+{{ host_main_course }} {% endblocktrans %}
+{{ chef_main_course.street }}, {{ chef_main_course.postal_code }} {{ chef_main_course.city }}
+{{ chef_main_course.participant_1_phone }}{% if chef_main_course.participant_2_phone %} bzw. {{ chef_main_course.participant_2_phone }}{% endif %}
+{% trans "Klingel Hinweis:" %} {{ chef_main_course.doorbell }}
+
+
+{% blocktrans with dessert_time=chef.event.dessert_time|date:"H.i" host_dessert=chef_dessert.name %}
+**Nachtisch - hier seid ihr gefragt!**
+Uhrzeit: {{ dessert_course_time }} Uhr
+Alle infos zu euren Gästen:{% endblocktrans %}
+Team {{ member1.name }}: {{ member1.participant_1_phone }} {% if member1.participant_2_phone %} / {{ member1.participant_2_phone }} {% endif %}
+Team {{ member2.name }}: {{ member2.participant_1_phone }} {% if member2.participant_2_phone %} / {{ member2.participant_2_phone }} {% endif %}
+
+{% if member1.allergies or member2.allergies %}
+{% trans "Allergien/Unverträglichkeiten eurer Gäste:" %}
+{{ member1.allergies }}
+{{ member2.allergies }}
+{% else %}
+{% trans "Ihr müsst keinerlei Allergien oder Unverträglichkeiten beachten." %}
+{% endif %}
+
+
+
+{% trans "Da die Teams, die den Hauptgang zubereiten tendenziell einen größeren finanziellen Aufwand haben, wäre es toll, wenn ihr dorthin alkoholische Getränke mitbringen könntet, um die Gastgeber etwas zu entlasten." %}
+
+*Afterparty*
+{% blocktrans with afterparty_location=chef.event.afterparty_location afterparty_time=chef.event.afterparty_time|date:"H.i" %}
+Es gibt im Anschluss eine Afterparty im {{ afterparty_location }}, um den Abend gemeinsam ausklingen zu lassen. Wir treffen uns dort ab {{ afterparty_time }} Uhr.
+{% endblocktrans %}
+
+
+{% blocktrans with phone=chef.event.advisor.phone name=chef.event.advisor.name %}
+Bei Problemen oder Rückfragen könnt ihr euch gerne an uns wenden: {{ phone }} ({{ name }}).
+{% endblocktrans %}
+
+{% trans "Wir wünschen euch gutes Gelingen und guten Appetit!" %}
+{% endblock %}

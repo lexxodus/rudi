@@ -1,0 +1,12 @@
+{% extends "rudi/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="message-container">
+    <h1>{{ event.name }} {{ event.semester }}</h1>
+    <h2>{% trans "Code bestätigt!" %}</h2>
+    <p>
+        {% trans "Du hast erfolgreich deine E-Mail Adresse bestätigt. Sobald die Anmeldung abgelaufen ist, versorgen wir euch mit weiteren Informationen per E-Mail." %}
+    </p>
+</div>
+{% endblock %}

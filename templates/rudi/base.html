@@ -1,0 +1,42 @@
+{% load bootstrap3 %}
+{% load staticfiles %}
+{% load i18n %}
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="NONE,NOARCHIVE" />
+<title>{% trans "Dinner Anmeldung" %}</title>
+{% bootstrap_css %}
+<link rel='stylesheet' type='text/css' href='{% static 'css/jquery-ui/smoothness/jquery-ui.css' %}' />
+<link rel="stylesheet" href="{% static "rudi/css/style.css" %}" />
+<link rel="stylesheet" href="{% static "rudi/css/tooltipster.css" %}" />
+</head>
+<body>
+    <header>
+    <div class="row">
+        <div class="lang_selection col-sm-offset-1 col-md-offset-4 col-xs-offset-1 col-xs-1">
+        {% get_available_languages as LANGUAGES %}
+        {% get_current_language as current %}
+        {% for lang_code, lang_name in LANGUAGES %}
+        {% get_language_info for lang_code as lang %}
+            {% language lang_code %}
+            {% if lang_code != current %}
+                <a class="lang_link" href="{% url 'rudi:registration' %}">{{ lang.name_local }}</a>
+            {% endif %}
+            {% endlanguage %}
+        {% endfor %}
+        </div>
+    </div>
+    </header>
+    <div class="content col-md-offset-1">
+        {% block content %}{% endblock %}
+    </div>
+    <footer class ="col-sm-offset-1">
+    </footer>
+    <script type="text/javascript" src="{{ STATIC_URL }}js/jquery.js"></script>
+    <script type="text/javascript" src="{{ STATIC_URL }}js/jquery-ui.js"></script>
+    <script type="text/javascript" src="{{ STATIC_URL }}rudi/js/jquery.tooltipster.min.js"></script>
+    {% bootstrap_javascript %}
+</body>
+</html>
