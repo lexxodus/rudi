@@ -9,7 +9,7 @@ from rudi.models import Group
 import socket
 
 SUBJECT_CODE = "Anmeldung zum %s %s"
-SUBJECT_CODE = "%s %s - Teamzuweisung"
+SUBJECT_ASSIGNMENT = "%s %s - Teamzuweisung"
 
 
 def send_single(context, text_template, subject, sender, recipients):
@@ -131,7 +131,7 @@ def _send_assignment_per_course(group):
             "chef_appetizer": chef_appetizer.chef,
             "chef_main_course": chef_main_course.chef,
         })
-    subject = SUBJECT_CODE % (group.event.name, group.event.semester)
+    subject = SUBJECT_ASSIGNMENT % (group.event.name, group.event.semester)
     if group.chef.participant_2_email:
         recipients = [
             group.chef.participant_1_email,
