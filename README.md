@@ -25,7 +25,7 @@ Then you have to add the apps urls to your projects urls.py:
 url(
     r'^dinner/',
     include(
-        'running_dinner.urls', namespace="running_dinner"
+        'rudi.urls', namespace="rudi"
     ),
 )
 ```
