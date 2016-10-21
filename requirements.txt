@@ -1,7 +1,9 @@
 base58==0.2.2
-Django==1.7.11
+Django==1.8.12
 django-bootstrap3==7.0.1
 django-jquery==1.12.2
 django-jquery-ui==1.11.4.1
 PuLP==1.6.1
 pyparsing==2.1.1
+base58==0.2.2
+googlemaps==2.4.4
