@@ -159,18 +159,20 @@ class Coordinator():
                     # TODO save known distances to avoid unnecessary requests
                     try:
                         r = self.gmaps.distance_matrix(
-                            origins="%s,%s,%s" % (
+                            origins="%s,%s,%s".encode("utf-8") % (
                                 t.postal_code, t.city, t.street),
-                            destinations="%s,%s,%s" % (
+                            destinations="%s,%s,%s".encode("utf-8") % (
                                 dt.postal_code, dt.city, dt.street),
                             mode="walking",
                         )
                     except googlemaps.exceptions.Timeout():
                         self.distance[t][dt] = DEFAULT_DISTANCE
                     else:
-                        self.distance[t][dt] =\
-                            r["rows"][0]["elements"][0]["duration"]["value"]\
-                            if r else DEFAULT_DISTANCE
+                        try:
+                            self.distance[t][dt] =\
+                            r["rows"][0]["elements"][0]["duration"]["value"]
+                        except:
+                            self.distance[t][dt] = DEFAULT_DISTANCE
         # binary Decision Variables
         self.assign = LpVariable.dicts(
             "Assign team t to group g for course ",

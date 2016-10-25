@@ -146,6 +146,12 @@ class Team(models.Model):
 
     def clean(self):
 
+        if self.street:
+            self.street = re.sub("[^A-Za-z0-9./]+", " ", self.street)
+
+        if self.city:
+            self.city = re.sub("[^A-Za-z0-9()/-]+", " ", self.city)
+
         if self.name and self.event:
             try:
                 team = Team.objects.filter(event=self.event).get(
