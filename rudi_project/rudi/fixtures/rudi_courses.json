@@ -1,23 +1,23 @@
 [
-{
+  {
     "fields": {
-        "name": "a"
+      "name": "a"
     },
     "model": "rudi.course",
     "pk": 1
-},
-{
+  },
+  {
     "fields": {
-        "name": "m"
+      "name": "m"
     },
     "model": "rudi.course",
     "pk": 2
-},
-{
+  },
+  {
     "fields": {
-        "name": "d"
+      "name": "d"
     },
     "model": "rudi.course",
     "pk": 3
-}
+  }
 ]

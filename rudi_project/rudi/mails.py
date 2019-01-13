@@ -1,11 +1,11 @@
-from __future__ import unicode_literals
+# -*- coding: UTF-8 -*-
+from .models import Group
 from django.core.mail import send_mail, send_mass_mail
-from django.core.urlresolvers import reverse
 from django.db.models import Q
 from django.template import Context, loader
+from django.urls import reverse
 from django.utils.translation import override
 import email
-from rudi.models import Group
 import socket
 
 SUBJECT_CODE = "Anmeldung zum %s %s"

@@ -17,7 +17,7 @@ Also the google maps distance matrix key has to be added to your projects config
 
 After migrating the apps database tables you have to load the dinners courses:
 
-`./manage.py loaddata rudi/fixtures/running_dinner_courses.json`
+`./manage.py loaddata rudi/fixtures/rudi_courses.json`
 
 Then you have to add the apps urls to your projects urls.py:
 

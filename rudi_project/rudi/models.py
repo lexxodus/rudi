@@ -1,18 +1,20 @@
 # -*- coding: UTF-8 -*-
-from __future__ import unicode_literals
+import random
+import re
+import time
+from hashlib import sha256
+
 import base58
 from django.core.exceptions import FieldError, ValidationError
 from django.db import models
 from django.template import Context, Template
 from django.utils.translation import ugettext_lazy as _
-from hashlib import sha256
-import random
-import time
 
 ERROR_EMAIL_DUPLICATE = _("Diese E-Mail Adresse darf nur einmal angegeben "
                           "werden.")
-ERROR_EMAIL_EXISTING = _("Diese E-Mail Adresse wurde bereits von einem anderem"
-                         " Team angemeldet.")
+ERROR_EMAIL_EXISTING = _(
+    "Diese E-Mail Adresse wurde bereits von einem anderem"
+    " Team angemeldet.")
 ERROR_NAME = _("Dieser Teamname existiert bereits.")
 ERROR_PHONE = _('Bitte gib eine valide Telefonnummer an z.B. '
                 '555 123321 or 0555-555-5-555')
@@ -23,12 +25,12 @@ class Advisor(models.Model):
     phone = models.CharField(max_length=50)
     email = models.EmailField()
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s" % self.name
 
 
 class Event(models.Model):
-    advisor = models.ForeignKey(Advisor)
+    advisor = models.ForeignKey(Advisor, models.CASCADE)
     name = models.CharField(max_length=100)
     semester = models.CharField(
         max_length=50,
@@ -56,8 +58,8 @@ class Event(models.Model):
                 if active_event != self:
                     raise ValidationError({
                         'active':
-                        'The dinner of %s is already set to active!\
-                         Deactive this event first to activate this one!'
+                            'The dinner of %s is already set to active!\
+                             Deactive this event first to activate this one!'
                             % active_event.semester})
 
     def get_dynamic_desc(self, language):
@@ -80,7 +82,7 @@ class Event(models.Model):
         dyn_desc = template.render(context)
         return dyn_desc
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s" % self.semester
 
 
@@ -95,12 +97,12 @@ class Course(models.Model):
         choices=CHOICES_NAME,
     )
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s" % self.get_name_display()
 
 
 class Team(models.Model):
-    event = models.ForeignKey(Event)
+    event = models.ForeignKey(Event, models.CASCADE)
     name = models.CharField(max_length=100, verbose_name="Team Name")
     street = models.CharField(max_length=100)
     city = models.CharField(max_length=50)
@@ -145,17 +147,27 @@ class Team(models.Model):
     sent_assignment_mail = models.BooleanField(default=False)
 
     def clean(self):
+        self.check_street()
+        self.check_city()
+        self.check_team_name_uniquity()
+        self.check_phones()
+        self.check_emails()
+        self.check_code()
 
+    def check_street(self):
         if self.street:
             self.street = re.sub("[^A-Za-z0-9./]+", " ", self.street)
 
+    def check_city(self):
         if self.city:
             self.city = re.sub("[^A-Za-z0-9()/-]+", " ", self.city)
 
+    def check_team_name_uniquity(self):
         if self.name and self.event:
             try:
-                team = Team.objects.filter(event=self.event).get(
-                    name=self.name)
+                team = Team.objects \
+                    .filter(event=self.event) \
+                    .get(name=self.name)
             except:
                 pass
             else:
@@ -163,62 +175,58 @@ class Team(models.Model):
                     raise ValidationError(
                         {"name": ERROR_NAME})
 
+    def check_phone(self, number):
+        if ModelHelper.is_phone(number):
+            return ModelHelper.clean_phone(number)
+
+    def check_phones(self):
         if self.participant_1_phone:
-            if ModelHelper.is_phone(self.participant_1_phone):
-                self.participant_1_phone = ModelHelper.clean_phone(
-                        self.participant_1_phone)
-            else:
-                raise ValidationError(
-                    {"participant_1_phone": ERROR_PHONE}
-                )
+            self.participant_1_phone = self.check_phone(
+                self.participant_1_phone)
+        else:
+            raise ValidationError(
+                {"participant_1_phone": ERROR_PHONE}
+            )
 
         if self.participant_2_phone:
-            if ModelHelper.is_phone(self.participant_2_phone):
-                self.participant_2_phone = ModelHelper.clean_phone(
-                        self.participant_2_phone)
-            else:
-                raise ValidationError(
-                    ERROR_EMAIL_DUPLICATE
-                )
+            self.participant_2_phone = self.check_phone(
+                self.participant_2_phone)
+        else:
+            raise ValidationError(
+                {"participant_2_phone": ERROR_PHONE}
+            )
 
+    def check_email_uniquity(self, email):
+        teams = []
+        try:
+            teams.append(Team.objects.filter(event=self.event).get(
+                participant_1_email=email))
+        except Team.DoesNotExist:
+            pass
+        try:
+            teams.append(Team.objects.filter(event=self.event).get(
+                participant_2_email=email))
+        except Team.DoesNotExist:
+            pass
+
+    def check_emails(self):
         if self.participant_1_email and self.event:
-            teams = []
-            try:
-                teams.append(Team.objects.filter(event=self.event).get(
-                    participant_1_email=self.participant_1_email))
-            except Team.DoesNotExist:
-                pass
-            try:
-                teams.append(Team.objects.filter(event=self.event).get(
-                    participant_2_email=self.participant_1_email))
-            except Team.DoesNotExist:
-                pass
+            teams = self.check_email_uniquity(self.participant_1_email)
             if teams and self not in teams:
                 raise ValidationError(
                     {"participant_1_email": ERROR_EMAIL_EXISTING})
-
         if self.participant_2_email and self.event:
-            teams = []
-            try:
-                teams.append(Team.objects.filter(event=self.event).get(
-                    participant_1_email=self.participant_2_email))
-            except Team.DoesNotExist:
-                pass
-            try:
-                teams.append(Team.objects.filter(event=self.event).get(
-                    participant_2_email=self.participant_2_email))
-            except Team.DoesNotExist:
-                pass
+            teams = self.check_email_uniquity(self.participant_2_email)
             if teams and self not in teams:
                 raise ValidationError(
                     {"participant_2_email": ERROR_EMAIL_EXISTING})
-
-        if self.participant_1_email and self.participant_2_email:
-            if self.participant_1_email == self.participant_2_email:
+        if self.participant_1_email and self.participant_2_email and (
+            self.participant_1_email == self.participant_2_email):
                 raise ValidationError(
                     ERROR_EMAIL_DUPLICATE
                 )
 
+    def check_code(self):
         if not self.code and self.event:
             self.create_code()
 
@@ -226,37 +234,37 @@ class Team(models.Model):
         if self.code:
             raise FieldError
         hash_input = (
-            "fim_rudi" + self.participant_1_email +
-            str(time.clock()) +
-            str(self.event) +
-            str(random.random()))
-        digest = sha256(hash_input).digest()
+                "fim_rudi" + self.participant_1_email +
+                str(time.clock()) +
+                str(self.event) +
+                str(random.random()))
+        digest = sha256(hash_input.encode("utf-8")).digest()
         # if code already exists create another
         new_code = base58.b58encode(digest)
         if Team.objects.filter(code=new_code).exists():
             return self.create_code()
         self.code = new_code
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s" % self.name
 
 
 class Group(models.Model):
-    course = models.ForeignKey(Course)
-    event = models.ForeignKey(Event)
-    chef = models.ForeignKey(Team, related_name="chef")
-    member1 = models.ForeignKey(Team, related_name="member1")
-    member2 = models.ForeignKey(Team, related_name="member2")
+    course = models.ForeignKey(Course, models.CASCADE)
+    event = models.ForeignKey(Event, models.CASCADE)
+    chef = models.ForeignKey(Team, models.CASCADE, related_name="chef")
+    member1 = models.ForeignKey(Team, models.CASCADE, related_name="member1")
+    member2 = models.ForeignKey(Team, models.CASCADE, related_name="member2")
 
-    def __unicode__(self):
-        return "course:%s, chef:%s, member1:%s, member2:%s" %\
-                (self.course, self.chef, self.member1, self.member2)
+    def __str__(self):
+        return "course:%s, chef:%s, member1:%s, member2:%s" % \
+               (self.course, self.chef, self.member1, self.member2)
 
 
 class ModelHelper():
     @staticmethod
     def clean_phone(number):
-        return number.replace(" ", "").replace("/", "")\
+        return number.replace(" ", "").replace("/", "") \
             .replace("-", "")
 
     @staticmethod
